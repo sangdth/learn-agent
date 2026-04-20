@@ -12,6 +12,13 @@ pnpm dev                   # http://localhost:3000
 
 ## Try it
 
+Health check:
+
+```bash
+curl http://localhost:3000/healthz
+# {"ok":true}  (plus x-request-id response header)
+```
+
 Non-streaming:
 
 ```bash

@@ -1,51 +1,38 @@
-import { Hono } from 'hono'
 import { streamSSE } from 'hono/streaming'
 import { zValidator } from '@hono/zod-validator'
-import { getDefaultAgent } from '../mastra/index.js'
+import { getChatService } from '../services/chat-service.js'
+import { createRouter } from '../utils/create-router.js'
 import {
   chatCompletionRequestSchema,
   type ChatCompletionChunk,
-  type ChatMessage,
 } from '../schemas/openai.js'
-import {
-  newId,
-  toOpenAIChunk,
-  toOpenAIResponse,
-} from './chat-mapping.js'
+import { newId, toOpenAIChunk, toOpenAIResponse } from './chat-mapping.js'
+import type { ApiErrorBody } from '../utils/error-handler.js'
 
-const toAgentMessages = (
-  messages: readonly ChatMessage[],
-): Array<{ role: ChatMessage['role']; content: string }> =>
-  messages.map((m) => ({ role: m.role, content: m.content }))
-
-const lastUserContent = (messages: readonly ChatMessage[]): string =>
-  [...messages].reverse().find((m) => m.role === 'user')?.content ?? ''
-
-export const chatRoute = new Hono().post(
+export const chatRoute = createRouter().post(
   '/completions',
   zValidator('json', chatCompletionRequestSchema),
   async (c) => {
     const body = c.req.valid('json')
-    const agent = getDefaultAgent()
+    const service = getChatService()
     const id = newId()
     const created = Math.floor(Date.now() / 1000)
-    const promptText = lastUserContent(body.messages)
 
     if (!body.stream) {
-      const result = await agent.generate(toAgentMessages(body.messages))
+      const result = await service.generate(body.messages)
       return c.json(
         toOpenAIResponse({
           id,
           created,
           model: body.model,
           content: result.text,
-          promptText,
+          promptText: result.promptText,
         }),
       )
     }
 
     return streamSSE(c, async (stream) => {
-      const agentStream = await agent.stream(toAgentMessages(body.messages))
+      const { textStream } = await service.stream(body.messages)
 
       const roleChunk: ChatCompletionChunk = toOpenAIChunk({
         id,
@@ -55,15 +42,29 @@ export const chatRoute = new Hono().post(
       })
       await stream.writeSSE({ data: JSON.stringify(roleChunk) })
 
-      for await (const text of agentStream.textStream) {
-        if (!text) continue
-        const chunk: ChatCompletionChunk = toOpenAIChunk({
-          id,
-          created,
-          model: body.model,
-          delta: { content: text },
-        })
-        await stream.writeSSE({ data: JSON.stringify(chunk) })
+      try {
+        for await (const text of textStream) {
+          if (!text) continue
+          const chunk: ChatCompletionChunk = toOpenAIChunk({
+            id,
+            created,
+            model: body.model,
+            delta: { content: text },
+          })
+          await stream.writeSSE({ data: JSON.stringify(chunk) })
+        }
+      } catch {
+        // onError can't reach an already-open SSE stream; emit a terminal error frame instead.
+        const errorBody: ApiErrorBody = {
+          error: {
+            code: 'stream_error',
+            message: 'Streaming failed',
+            requestId: c.get('requestId') ?? '',
+          },
+        }
+        await stream.writeSSE({ data: JSON.stringify(errorBody) })
+        await stream.writeSSE({ data: '[DONE]' })
+        return
       }
 
       const doneChunk: ChatCompletionChunk = toOpenAIChunk({

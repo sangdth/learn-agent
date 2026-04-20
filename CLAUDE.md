@@ -25,10 +25,31 @@ Tests live alongside source as `*.test.ts`. They run under Vitest with `passWith
 
 ## Architecture
 
-- **Entrypoint:** `src/index.ts` creates a `Hono` app and passes `app.fetch` to `@hono/node-server`'s `serve()`. Route groups are mounted with `app.route()` — currently `chatRoute` at `/v1/chat`.
+The app is layered. Request flow:
+
+```
+client → index.ts  (logger → cors → requestId → routes → onError/notFound)
+           └─ /v1/chat → routes/chat.ts  (zValidator → chat-mapping → SSE/JSON)
+                                └─ services/chat-service.ts  (toAgentMessages → mastra agent)
+                                                            └─ mastra/agents/default-agent.ts  (env → Agent)
+```
+
+- **Entrypoint (`src/index.ts`):** Builds the app via `createRouter()` so `Variables` is typed, applies global middleware in order (`logger`, `cors`, `requestId`), exposes `GET /healthz`, mounts route groups with `app.route()`, then calls `registerErrorHandler(app)` which wires both `onError` and `notFound`. Server starts via `@hono/node-server` unless `NODE_ENV === 'test'`.
+- **Router factory (`src/utils/create-router.ts`):** `createRouter()` returns `new Hono<{ Variables: { requestId: string } }>()`. Every sub-router uses it so `c.get('requestId')` is typed everywhere.
+- **Middleware (`src/middleware/`):** `requestId` reads `x-request-id` (or generates a UUID), stores it in context, mirrors it back in the response header.
+- **Config (`src/config/env.ts`):** Single Zod schema parses `process.env` at module load. `OPENCODE_API_KEY`, `OPENCODE_BASE_URL`, `DEFAULT_MODEL`, `PORT`, `NODE_ENV`. Failures throw one aggregated error naming every missing/invalid field.
+- **Service layer (`src/services/chat-service.ts`):** `createChatService(agent)` returns `{ generate, stream }`. Moves `toAgentMessages` / `lastUserContent` out of the route. A lazy `getChatService()` returns the singleton wired to the default Mastra agent. Tests mock this module.
+- **Mastra layer (`src/mastra/`):** `default-agent.ts` reads from `env` and builds one `Agent` (OpenAI-compatible model config). `index.ts` registers it on a `Mastra` instance and exposes `getDefaultAgent()`.
+- **Chat route (`src/routes/chat.ts`):** Validates the OpenAI-shaped request with `zValidator`, delegates to `getChatService()`, and translates outputs into OpenAI `chat.completion` / `chat.completion.chunk` SSE frames via pure helpers in `src/routes/chat-mapping.ts`. Streaming errors emit a terminal `{ error: {...} }` SSE frame + `[DONE]` because `onError` can't reach an already-open stream.
+- **Error handling (`src/utils/error-handler.ts`):** `registerErrorHandler(app)` attaches `onError` and `notFound`. Errors map to `{ error: { code, message, requestId } }`. `HTTPException` → its own status, `ZodError` → 400 `validation_error`, everything else → 500 `internal_error` with a generic message (never leaks `err.message`).
 - **Runtime:** Node via `@hono/node-server`. `tsx watch` runs TypeScript directly in dev; `tsc` emits ESM to `dist/` for `pnpm start`.
-- **Mastra layer (`src/mastra/`):** A single default `Agent` is built at module load in `src/mastra/agents/default-agent.ts` using Mastra's native `OpenAICompatibleConfig`. `src/mastra/index.ts` registers it on a `Mastra` instance and exports `getDefaultAgent()`.
-- **Chat route (`src/routes/chat.ts`):** Validates the OpenAI-shaped request with Zod, calls `getDefaultAgent().generate()` for non-streaming and `.stream()` for streaming, and translates outputs into OpenAI `chat.completion` / `chat.completion.chunk` SSE frames via pure helpers in `src/routes/chat-mapping.ts`.
+
+### Response envelopes
+
+- **Success:** route-specific (OpenAI-shaped for `/v1/chat/completions`, `{ ok: true }` for `/healthz`).
+- **Error (JSON):** `{ "error": { "code": "<machine_code>", "message": "<human>", "requestId": "<uuid>" } }`.
+- **Error (streaming SSE):** after the stream opens, a terminal data frame with the same `{ error: {...} }` shape, followed by `data: [DONE]`.
+- Every response carries the `x-request-id` header (echoing the incoming one or a generated UUID).
 
 ## Environment variables
 
@@ -39,7 +60,7 @@ Copy `.env.example` → `.env` and fill in:
 - `DEFAULT_MODEL` — required, `provider/model` shape (e.g. `opencode/qwen3.5-plus`). Validated at startup.
 - `PORT` — optional, defaults to 3000.
 
-The agent validates all three required vars at module load and throws a clear error message if any are missing.
+`src/config/env.ts` is the single source of truth — a Zod schema over `process.env`, parsed at module load. On failure it throws one aggregated error naming every missing/invalid field. Everything else (`default-agent.ts`, `index.ts`) imports typed values from there; no module reads `process.env` directly.
 
 ### Model field caveat
 

@@ -5,8 +5,8 @@ const { generateMock, streamMock } = vi.hoisted(() => ({
   streamMock: vi.fn(),
 }))
 
-vi.mock('../mastra/index.js', () => ({
-  getDefaultAgent: () => ({
+vi.mock('../services/chat-service.js', () => ({
+  getChatService: () => ({
     generate: generateMock,
     stream: streamMock,
   }),
@@ -23,8 +23,11 @@ describe('POST /completions (non-streaming)', () => {
     streamMock.mockReset()
   })
 
-  it('calls the agent and returns an openai-shaped response', async () => {
-    generateMock.mockResolvedValueOnce({ text: 'Hi from agent' })
+  it('calls the service and returns an openai-shaped response', async () => {
+    generateMock.mockResolvedValueOnce({
+      text: 'Hi from agent',
+      promptText: 'Hello?',
+    })
 
     const route = await loadRoute()
     const res = await route.request('/completions', {
@@ -102,6 +105,7 @@ describe('POST /completions (streaming)', () => {
   it('emits role, content, stop, and [DONE] frames', async () => {
     streamMock.mockResolvedValueOnce({
       textStream: toAsync(['Hello', ' world']),
+      promptText: 'Hi',
     })
 
     const route = await loadRoute()
@@ -135,5 +139,37 @@ describe('POST /completions (streaming)', () => {
     expect(parsed[2]?.choices[0]?.delta).toEqual({ content: ' world' })
     expect(parsed.at(-1)?.choices[0]?.finish_reason).toBe('stop')
     expect(streamMock).toHaveBeenCalledTimes(1)
+  })
+
+  it('emits a terminal error frame when the underlying stream throws', async () => {
+    async function* throwingStream(): AsyncIterable<string> {
+      yield 'partial'
+      throw new Error('boom')
+    }
+    streamMock.mockResolvedValueOnce({
+      textStream: throwingStream(),
+      promptText: 'Hi',
+    })
+
+    const route = await loadRoute()
+    const res = await route.request('/completions', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        model: 'gpt-4o-mini',
+        messages: [{ role: 'user', content: 'Hi' }],
+        stream: true,
+      }),
+    })
+
+    expect(res.status).toBe(200)
+    const frames = await collectSSE(res)
+    expect(frames.at(-1)).toBe('[DONE]')
+    const errorFrame = frames.at(-2)
+    expect(errorFrame).toBeDefined()
+    const parsed = JSON.parse(errorFrame ?? '{}') as {
+      error?: { code: string; message: string }
+    }
+    expect(parsed.error?.code).toBe('stream_error')
   })
 })

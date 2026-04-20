@@ -1,0 +1,8 @@
+{
+  "permissions": {
+    "allow": [
+      "Read(//Users/sang/.claude/plans/**)",
+      "Read(//Users/sang/.claude/projects/**)"
+    ]
+  }
+}
