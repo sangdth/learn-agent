@@ -105,7 +105,6 @@ describe('POST /completions (streaming)', () => {
   it('emits role, content, stop, and [DONE] frames', async () => {
     streamMock.mockResolvedValueOnce({
       textStream: toAsync(['Hello', ' world']),
-      promptText: 'Hi',
     });
 
     const route = await loadRoute();
@@ -149,7 +148,6 @@ describe('POST /completions (streaming)', () => {
     }
     streamMock.mockResolvedValueOnce({
       textStream: throwingStream(),
-      promptText: 'Hi',
     });
 
     const route = await loadRoute();

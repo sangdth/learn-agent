@@ -1,7 +1,7 @@
 import { Mastra } from '@mastra/core/mastra'
 import { defaultAgent } from './agents/default-agent'
 
-export const mastra = new Mastra({
+new Mastra({
   agents: { defaultAgent },
 })
 

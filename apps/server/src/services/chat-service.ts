@@ -14,7 +14,6 @@ export interface GenerateResult {
 
 export interface StreamResult {
   textStream: AsyncIterable<string>;
-  promptText: string;
 }
 
 const toAgentMessages = (messages: readonly ChatMessage[]): AgentMessage[] =>
@@ -45,7 +44,6 @@ export const createChatService = (agent: ChatServiceAgent): ChatService => ({
     const agentStream = await agent.stream(toAgentMessages(messages));
     return {
       textStream: agentStream.textStream,
-      promptText: lastUserContent(messages),
     };
   },
 });

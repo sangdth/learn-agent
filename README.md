@@ -7,8 +7,8 @@ Turborepo monorepo on Bun. `apps/*` are deployables, `packages/*` are shared lib
 ```
 learn-agent/
 ├── apps/
-│   ├── api/          # Hono + Mastra backend (@repo/api)
-│   └── web/          # Svelte 5 + Vite SPA  (@repo/web)
+│   ├── server/       # Hono + Mastra backend (@repo/api)
+│   └── client/       # Svelte 5 + Vite SPA  (@repo/web)
 └── packages/
     └── schemas/      # Shared Zod request schemas (@repo/schemas)
 ```
@@ -17,7 +17,7 @@ learn-agent/
 
 ```bash
 bun install
-cp apps/api/.env.example apps/api/.env   # fill in LLM_API_KEY etc.
+cp apps/server/.env.example apps/server/.env   # fill in LLM_API_KEY etc.
 bun dev                                   # api :3000, web :5173 in parallel
 ```
 
@@ -30,11 +30,11 @@ All root scripts delegate to `turbo run <task>`. Each workspace owns the actual 
 | Root command        | What it does                                                         |
 | ------------------- | -------------------------------------------------------------------- |
 | `bun dev`           | `turbo run dev` — watch-mode API + Vite dev server, in parallel      |
-| `bun run build`     | `turbo run build` — `apps/api/dist/` (Bun bundle) + `apps/web/dist/` |
-| `bun run typecheck` | `turbo run typecheck` — tsc for api + schemas, svelte-check for web  |
-| `bun run test`      | `turbo run test` — Vitest suite in `apps/api`                        |
+| `bun run build`     | `turbo run build` — `apps/server/dist/` (Bun bundle) + `apps/client/dist/` |
+| `bun run typecheck` | `turbo run typecheck` — tsc for server + schemas, svelte-check for client  |
+| `bun run test`      | `turbo run test` — Vitest suite in `apps/server`                     |
 
-> Inside `apps/api`, use `bun run test` — not `bun test`. The latter triggers Bun's native test runner, which doesn't understand `vi.mock`/`vi.hoisted`. Turbo invokes scripts via `bun run`, so this only matters if you cd into a package.
+> Inside `apps/server`, use `bun run test` — not `bun test`. The latter triggers Bun's native test runner, which doesn't understand `vi.mock`/`vi.hoisted`. Turbo invokes scripts via `bun run`, so this only matters if you cd into a package.
 
 ## Try the API directly
 

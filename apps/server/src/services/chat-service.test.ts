@@ -32,7 +32,7 @@ describe('createChatService', () => {
     expect(result.promptText).toBe('LAST user turn')
   })
 
-  it('stream forwards the textStream and exposes promptText', async () => {
+  it('stream forwards the textStream', async () => {
     const textStream = toAsync(['chunk-a', 'chunk-b'])
     const generate = vi.fn()
     const stream = vi.fn().mockResolvedValueOnce({ textStream })
@@ -41,7 +41,6 @@ describe('createChatService', () => {
     const result = await service.stream(messages)
 
     expect(stream).toHaveBeenCalledTimes(1)
-    expect(result.promptText).toBe('LAST user turn')
 
     const collected: string[] = []
     for await (const chunk of result.textStream) collected.push(chunk)

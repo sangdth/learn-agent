@@ -56,7 +56,6 @@ describe('POST /chat (AI SDK UI stream)', () => {
   it('streams text-start, text-delta, text-end parts for a valid request', async () => {
     streamMock.mockResolvedValueOnce({
       textStream: toAsync(['Hello', ' world']),
-      promptText: 'Hi',
     });
 
     const route = await loadRoute();
@@ -125,7 +124,6 @@ describe('POST /chat (AI SDK UI stream)', () => {
     }
     streamMock.mockResolvedValueOnce({
       textStream: throwingStream(),
-      promptText: 'Hi',
     });
 
     const route = await loadRoute();
