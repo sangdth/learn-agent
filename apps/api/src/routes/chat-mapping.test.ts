@@ -5,7 +5,7 @@ import {
   toOpenAIChunk,
   toOpenAIResponse,
 } from './chat-mapping'
-import type { ChatCompletionResponse } from '../schemas/openai'
+import type { ChatCompletionResponse } from '@repo/schemas'
 
 describe('approxTokens', () => {
   it('returns at least 1 for empty text', () => {

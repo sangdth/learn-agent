@@ -5,7 +5,7 @@ import { createRouter } from '../utils/create-router'
 import {
   chatCompletionRequestSchema,
   type ChatCompletionChunk,
-} from '../schemas/openai'
+} from '@repo/schemas'
 import { newId, toOpenAIChunk, toOpenAIResponse } from './chat-mapping'
 import type { ApiErrorBody } from '../utils/error-handler'
 

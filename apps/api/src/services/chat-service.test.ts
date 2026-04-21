@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from 'vitest'
 import { createChatService } from './chat-service'
-import type { ChatMessage } from '../schemas/openai'
+import type { ChatMessage } from '@repo/schemas'
 
 async function* toAsync<T>(values: readonly T[]): AsyncIterable<T> {
   for (const v of values) yield v

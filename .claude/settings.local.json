@@ -2,7 +2,8 @@
   "permissions": {
     "allow": [
       "Read(//Users/sang/.claude/plans/**)",
-      "Read(//Users/sang/.claude/projects/**)"
+      "Read(//Users/sang/.claude/projects/**)",
+      "WebFetch(domain:www.shadcn-svelte.com)"
     ]
   }
 }
