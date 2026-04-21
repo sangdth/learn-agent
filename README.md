@@ -17,7 +17,7 @@ learn-agent/
 
 ```bash
 bun install
-cp apps/api/.env.example apps/api/.env   # fill in OPENCODE_API_KEY etc.
+cp apps/api/.env.example apps/api/.env   # fill in LLM_API_KEY etc.
 bun dev                                   # api :3000, web :5173 in parallel
 ```
 
@@ -27,12 +27,12 @@ Open http://localhost:5173. The web app uses the AI SDK (`@ai-sdk/svelte` + `Def
 
 All root scripts delegate to `turbo run <task>`. Each workspace owns the actual task implementation.
 
-| Root command         | What it does                                                             |
-| -------------------- | ------------------------------------------------------------------------ |
-| `bun dev`            | `turbo run dev` — watch-mode API + Vite dev server, in parallel          |
-| `bun run build`      | `turbo run build` — `apps/api/dist/` (Bun bundle) + `apps/web/dist/`     |
-| `bun run typecheck`  | `turbo run typecheck` — tsc for api + schemas, svelte-check for web      |
-| `bun run test`       | `turbo run test` — Vitest suite in `apps/api`                            |
+| Root command        | What it does                                                         |
+| ------------------- | -------------------------------------------------------------------- |
+| `bun dev`           | `turbo run dev` — watch-mode API + Vite dev server, in parallel      |
+| `bun run build`     | `turbo run build` — `apps/api/dist/` (Bun bundle) + `apps/web/dist/` |
+| `bun run typecheck` | `turbo run typecheck` — tsc for api + schemas, svelte-check for web  |
+| `bun run test`      | `turbo run test` — Vitest suite in `apps/api`                        |
 
 > Inside `apps/api`, use `bun run test` — not `bun test`. The latter triggers Bun's native test runner, which doesn't understand `vi.mock`/`vi.hoisted`. Turbo invokes scripts via `bun run`, so this only matters if you cd into a package.
 

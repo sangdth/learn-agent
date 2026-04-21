@@ -57,7 +57,7 @@ apps/api/src/index.ts   (logger → cors → requestId → routes → onError/no
 - **Entrypoint (`apps/api/src/index.ts`):** Builds the app via `createRouter()` so `Variables` is typed, applies global middleware in order (`logger`, `cors`, `requestId`), exposes `GET /healthz`, mounts route groups with `app.route()`, then calls `registerErrorHandler(app)`. Exports named `app` (for tests) plus a default `{ port, fetch }` object that Bun auto-serves when the file is the CLI entrypoint.
 - **Router factory (`apps/api/src/utils/create-router.ts`):** `createRouter()` returns `new Hono<{ Variables: { requestId: string } }>()`. Every sub-router uses it so `c.get('requestId')` is typed everywhere.
 - **Middleware (`apps/api/src/middleware/`):** `requestId` reads `x-request-id` (or generates a UUID), stores it in context, mirrors it back in the response header. The Vite proxy preserves this header end-to-end.
-- **Config (`apps/api/src/config/env.ts`):** Single Zod schema parses `process.env` at module load. `OPENCODE_API_KEY`, `OPENCODE_BASE_URL`, `DEFAULT_MODEL`, `PORT`, `NODE_ENV`. Failures throw one aggregated error naming every missing/invalid field.
+- **Config (`apps/api/src/config/env.ts`):** Single Zod schema parses `process.env` at module load. `LLM_API_KEY`, `LLM_BASE_URL`, `DEFAULT_MODEL`, `PORT`, `NODE_ENV`. Failures throw one aggregated error naming every missing/invalid field.
 - **Service layer (`apps/api/src/services/chat-service.ts`):** `createChatService(agent)` returns `{ generate, stream }`. A lazy `getChatService()` returns the singleton wired to the default Mastra agent. Tests mock this module.
 - **Mastra layer (`apps/api/src/mastra/`):** `default-agent.ts` reads from `env` and builds one `Agent` (OpenAI-compatible model config). `index.ts` registers it on a `Mastra` instance and exposes `getDefaultAgent()`.
 - **Chat route (`apps/api/src/routes/chat.ts`):** Validates the OpenAI-shaped request with `zValidator`, delegates to `getChatService()`, and translates outputs into OpenAI `chat.completion` / `chat.completion.chunk` SSE frames via pure helpers in `chat-mapping.ts`. Streaming errors emit a terminal `{ error: {...} }` SSE frame + `[DONE]` because `onError` can't reach an already-open stream.
@@ -77,8 +77,8 @@ apps/api/src/index.ts   (logger → cors → requestId → routes → onError/no
 
 `.env` lives at **`apps/api/.env`**, not the repo root. Per Turborepo best practice, a root `.env` implicitly couples every package; keeping it inside the app that consumes it makes the dependency explicit. Bun auto-loads `.env` from the cwd at startup, and `turbo run dev` invokes the api script with `cwd=apps/api`.
 
-- `OPENCODE_API_KEY` — required. Bearer token for the OpenAI-compatible endpoint. Get one at <https://opencode.ai/auth>, or use any placeholder for local servers that don't authenticate.
-- `OPENCODE_BASE_URL` — required. Defaults to `https://opencode.ai/zen/v1` in `.env.example`. Point at vLLM / LM Studio / LiteLLM / any OpenAI-compatible `/chat/completions` server to switch backends.
+- `LLM_API_KEY` — required. Bearer token for the OpenAI-compatible endpoint. Get one at <https://opencode.ai/auth>, or use any placeholder for local servers that don't authenticate.
+- `LLM_BASE_URL` — required. Defaults to `https://opencode.ai/zen/v1` in `.env.example`. Point at vLLM / LM Studio / LiteLLM / any OpenAI-compatible `/chat/completions` server to switch backends.
 - `DEFAULT_MODEL` — required, `provider/model` shape (e.g. `opencode/qwen3.5-plus`). Validated at startup.
 - `PORT` — optional, defaults to 3000.
 

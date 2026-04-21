@@ -1,15 +1,29 @@
 import { z } from 'zod';
 
-const envSchema = z.object({
-  OPENCODE_API_KEY: z.string().min(1, 'OPENCODE_API_KEY is required'),
-  OPENCODE_BASE_URL: z.url('OPENCODE_BASE_URL must be a valid URL'),
-  DEFAULT_MODEL: z
-    .string()
-    .default('opencode-go/minimax-m2.7')
-    .refine((v) => v.includes('/'), {
+const openAICompatibleBaseUrlSchema = z
+  .url('LLM_BASE_URL must be a valid URL')
+  .transform((value) => value.replace(/\/+$/, ''))
+  .refine(
+    (value) =>
+      !value.endsWith('/chat/completions') && !value.endsWith('/messages'),
+    {
       message:
-        'DEFAULT_MODEL must be in "provider/model" form (e.g. opencode-go/minimax-m2.7)',
-    }),
+        'LLM_BASE_URL must be the API root (for example https://opencode.ai/zen/go/v1), not /chat/completions or /messages',
+    },
+  );
+
+const modelIdSchema = z
+  .string()
+  .regex(/^[^/]+\/[^/]+$/, {
+    message:
+      'DEFAULT_MODEL must be in "provider/model" form (e.g. opencode-go/minimax-m2.7)',
+  })
+  .transform((value) => value as `${string}/${string}`);
+
+const envSchema = z.object({
+  LLM_API_KEY: z.string().min(1, 'LLM_API_KEY is required'),
+  LLM_BASE_URL: openAICompatibleBaseUrlSchema,
+  DEFAULT_MODEL: modelIdSchema.default('opencode-go/minimax-m2.7'),
   PORT: z.coerce.number().int().positive().default(3000),
   NODE_ENV: z
     .enum(['development', 'test', 'production'])
