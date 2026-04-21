@@ -1,7 +1,7 @@
 import { streamSSE } from 'hono/streaming';
 import { zValidator } from '@hono/zod-validator';
-import { getChatService } from '../services/chat-service';
-import { createRouter } from '../utils/create-router';
+import { getChatService } from '@/services/chat-service';
+import { createRouter } from '@/utils/create-router';
 import {
   chatCompletionRequestSchema,
   type ChatCompletionChunk,

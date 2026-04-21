@@ -1,5 +1,5 @@
-import { Agent } from '@mastra/core/agent'
-import { env } from '../../config/env'
+import { Agent } from '@mastra/core/agent';
+import { env } from '@/config/env';
 
 export const defaultAgent = new Agent({
   id: 'default-agent',
@@ -12,6 +12,6 @@ export const defaultAgent = new Agent({
     url: env.OPENCODE_BASE_URL,
     apiKey: env.OPENCODE_API_KEY,
   },
-})
+});
 
-export type DefaultAgent = typeof defaultAgent
+export type DefaultAgent = typeof defaultAgent;

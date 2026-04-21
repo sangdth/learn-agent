@@ -5,7 +5,7 @@ const { generateMock, streamMock } = vi.hoisted(() => ({
   streamMock: vi.fn(),
 }));
 
-vi.mock('../services/chat-service', () => ({
+vi.mock('@/services/chat-service', () => ({
   getChatService: () => ({
     generate: generateMock,
     stream: streamMock,
