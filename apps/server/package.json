@@ -14,8 +14,6 @@
     "test:watch": "vitest"
   },
   "dependencies": {
-    "@ai-sdk/openai": "^3.0.53",
-    "@ai-sdk/openai-compatible": "^2.0.41",
     "@hono/zod-validator": "^0.7.6",
     "@mastra/core": "^1.25.0",
     "@repo/schemas": "workspace:*",

@@ -1,6 +1,6 @@
 # learn-agent
 
-Learning sandbox for building an AI agent on top of [Hono](https://hono.dev) and [Mastra](https://mastra.ai). Exposes an OpenAI-compatible `/v1/chat/completions` endpoint backed by a Mastra agent, plus a Svelte 5 SPA that talks to it.
+Learning sandbox for building an AI agent on top of [Hono](https://hono.dev) and [Mastra](https://mastra.ai). The API exposes two endpoints backed by the same Mastra agent: `/v1/chat/completions` (OpenAI-compatible, for external clients) and `/v1/ai/chat` (AI SDK UI message protocol, used by the Svelte 5 SPA).
 
 Turborepo monorepo on Bun. `apps/*` are deployables, `packages/*` are shared libraries consumed JIT (no build step).
 
@@ -21,7 +21,7 @@ cp apps/api/.env.example apps/api/.env   # fill in OPENCODE_API_KEY etc.
 bun dev                                   # api :3000, web :5173 in parallel
 ```
 
-Open http://localhost:5173. The web app posts to `/v1/chat/completions`, Vite proxies it through to the API on `:3000`.
+Open http://localhost:5173. The web app uses the AI SDK (`@ai-sdk/svelte` + `DefaultChatTransport`) to call `/v1/ai/chat`; Vite proxies it through to the API on `:3000`.
 
 ## Scripts
 

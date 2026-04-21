@@ -8,7 +8,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Workspace layout
 
-```
+```txt
 learn-agent/
 ├── apps/
 │   ├── api/          # Hono + Mastra backend                (@repo/api)
@@ -25,13 +25,13 @@ learn-agent/
 
 All root scripts delegate to `turbo run <task>`. Turbo parallelizes across workspaces and caches task outputs.
 
-| Task                 | Root command        | What turbo runs                                      |
-| -------------------- | ------------------- | ---------------------------------------------------- |
-| Install deps         | `bun install`       | —                                                    |
-| Dev (both apps)      | `bun dev`           | `turbo run dev` — api :3000 + web :5173 in parallel  |
-| Build all            | `bun run build`     | `turbo run build` — api bundle + web static bundle   |
-| Type-check all       | `bun run typecheck` | `turbo run typecheck` — tsc + svelte-check           |
-| Run tests            | `bun run test`      | `turbo run test` — Vitest in `apps/api`              |
+| Task            | Root command        | What turbo runs                                     |
+| --------------- | ------------------- | --------------------------------------------------- |
+| Install deps    | `bun install`       | —                                                   |
+| Dev (both apps) | `bun dev`           | `turbo run dev` — api :3000 + web :5173 in parallel |
+| Build all       | `bun run build`     | `turbo run build` — api bundle + web static bundle  |
+| Type-check all  | `bun run typecheck` | `turbo run typecheck` — tsc + svelte-check          |
+| Run tests       | `bun run test`      | `turbo run test` — Vitest in `apps/api`             |
 
 **⚠️ Inside a package, use `bun run test`, not `bun test`.** `bun test` triggers Bun's native test runner, which doesn't understand `vi.mock`/`vi.hoisted`. Turbo invokes scripts via `bun run`, so this only matters if you cd into a package and run tests directly.
 
@@ -39,17 +39,20 @@ Single-package tasks via filter: `bun x turbo run build --filter=@repo/web`.
 
 ## Request flow
 
-```
-browser (apps/web, Svelte 5)
-  │  POST /v1/chat/completions  (Vite dev proxy :5173 → :3000)
-  ▼
+```txt
+browser (apps/web, Svelte 5)          external clients (curl, SDKs)
+  │  POST /v1/ai/chat                   │  POST /v1/chat/completions
+  │  (AI SDK UI message stream)         │  (OpenAI-compatible SSE/JSON)
+  ▼                                     ▼
 apps/api/src/index.ts   (logger → cors → requestId → routes → onError/notFound)
-  └─ /v1/chat → routes/chat.ts        (zValidator over @repo/schemas → SSE/JSON)
+  ├─ /v1/ai   → routes/ai-chat.ts     (zValidator over @repo/schemas → AI SDK UI stream)
+  └─ /v1/chat → routes/chat.ts        (zValidator over @repo/schemas → OpenAI SSE/JSON)
                   └─ services/chat-service.ts   (toAgentMessages → mastra agent)
                        └─ mastra/agents/default-agent.ts   (env → OpenAI-compatible Agent)
 ```
 
-- **`@repo/schemas`** is the single source of truth for the OpenAI-compatible request shape (`chatCompletionRequestSchema`) and response types. Both sides of the wire import from it. Changes here propagate to api and web in one edit.
+- **`@repo/schemas`** is the single source of truth for wire contracts: `chatCompletionRequestSchema` (OpenAI request shape) and `aiChatRequestSchema` (AI SDK UI message shape), plus response/UIMessage types. Both sides of the wire import from it. Changes here propagate to api and web in one edit.
+- **`chat-service` as canonical internal interface:** both route adapters call `getChatService().generate(...)` / `.stream(...)`. Routes are protocol shims only — no model/provider logic leaks past `apps/api/src/services/chat-service.ts`.
 - **Vite proxy** in `apps/web/vite.config.ts` forwards `/v1/*` to `http://localhost:3000`. No CORS in dev. The existing CORS middleware on the API stays in place for cross-origin prod deployments.
 - **Entrypoint (`apps/api/src/index.ts`):** Builds the app via `createRouter()` so `Variables` is typed, applies global middleware in order (`logger`, `cors`, `requestId`), exposes `GET /healthz`, mounts route groups with `app.route()`, then calls `registerErrorHandler(app)`. Exports named `app` (for tests) plus a default `{ port, fetch }` object that Bun auto-serves when the file is the CLI entrypoint.
 - **Router factory (`apps/api/src/utils/create-router.ts`):** `createRouter()` returns `new Hono<{ Variables: { requestId: string } }>()`. Every sub-router uses it so `c.get('requestId')` is typed everywhere.
@@ -58,21 +61,23 @@ apps/api/src/index.ts   (logger → cors → requestId → routes → onError/no
 - **Service layer (`apps/api/src/services/chat-service.ts`):** `createChatService(agent)` returns `{ generate, stream }`. A lazy `getChatService()` returns the singleton wired to the default Mastra agent. Tests mock this module.
 - **Mastra layer (`apps/api/src/mastra/`):** `default-agent.ts` reads from `env` and builds one `Agent` (OpenAI-compatible model config). `index.ts` registers it on a `Mastra` instance and exposes `getDefaultAgent()`.
 - **Chat route (`apps/api/src/routes/chat.ts`):** Validates the OpenAI-shaped request with `zValidator`, delegates to `getChatService()`, and translates outputs into OpenAI `chat.completion` / `chat.completion.chunk` SSE frames via pure helpers in `chat-mapping.ts`. Streaming errors emit a terminal `{ error: {...} }` SSE frame + `[DONE]` because `onError` can't reach an already-open stream.
+- **AI chat route (`apps/api/src/routes/ai-chat.ts`):** Validates the AI SDK UI message request with `zValidator` over `aiChatRequestSchema`, flattens `parts[]` into plain text `ChatMessage[]`, delegates to `getChatService().stream()`, and writes `text-start` → `text-delta` → `text-end` frames via the AI SDK's `createUIMessageStream` / `createUIMessageStreamResponse`. Stream errors are surfaced as the protocol's own `error` frame (string) via `onError`.
 - **Error handling (`apps/api/src/utils/error-handler.ts`):** `registerErrorHandler(app)` attaches `onError` and `notFound`. Errors map to `{ error: { code, message, requestId } }`. `HTTPException` → its own status, `ZodError` → 400 `validation_error`, everything else → 500 `internal_error` with a generic message (never leaks `err.message`).
-- **Web app (`apps/web/src/App.svelte`, `src/lib/chat-client.ts`):** Svelte 5 runes (`$state`). The chat client posts to `/v1/chat/completions` with `stream: true`, parses SSE frames with native `ReadableStream` + `TextDecoderStream`, and appends deltas to the last assistant message. No AI SDK dependency — just `fetch`.
+- **Web app (`apps/web/src/App.svelte`):** Svelte 5 runes (`$state`). Uses the AI SDK (`@ai-sdk/svelte`'s `Chat` + `DefaultChatTransport` from `ai`) to call `/v1/ai/chat`. The SDK handles transport, streaming parse, and message state; the component just renders `chat.messages` and forwards input via `chat.sendMessage`.
 
 ### Response envelopes
 
-- **Success:** route-specific (OpenAI-shaped for `/v1/chat/completions`, `{ ok: true }` for `/healthz`).
+- **Success:** route-specific — OpenAI-shaped for `/v1/chat/completions`, AI SDK UI message stream (`text-start` / `text-delta` / `text-end` parts) for `/v1/ai/chat`, `{ ok: true }` for `/healthz`.
 - **Error (JSON):** `{ "error": { "code": "<machine_code>", "message": "<human>", "requestId": "<uuid>" } }`.
-- **Error (streaming SSE):** after the stream opens, a terminal data frame with the same `{ error: {...} }` shape, followed by `data: [DONE]`.
+- **Error (OpenAI streaming SSE):** after the stream opens, a terminal data frame with the same `{ error: {...} }` shape, followed by `data: [DONE]`.
+- **Error (AI SDK UI stream):** an `error` frame (string message) emitted via `createUIMessageStream`'s `onError` channel; the SDK surfaces it on the client as `chat.error`.
 - Every response carries the `x-request-id` header (echoing the incoming one or a generated UUID). The Vite proxy forwards it unchanged to the browser.
 
 ## Environment variables
 
 `.env` lives at **`apps/api/.env`**, not the repo root. Per Turborepo best practice, a root `.env` implicitly couples every package; keeping it inside the app that consumes it makes the dependency explicit. Bun auto-loads `.env` from the cwd at startup, and `turbo run dev` invokes the api script with `cwd=apps/api`.
 
-- `OPENCODE_API_KEY` — required. Bearer token for the OpenAI-compatible endpoint. Get one at https://opencode.ai/auth, or use any placeholder for local servers that don't authenticate.
+- `OPENCODE_API_KEY` — required. Bearer token for the OpenAI-compatible endpoint. Get one at <https://opencode.ai/auth>, or use any placeholder for local servers that don't authenticate.
 - `OPENCODE_BASE_URL` — required. Defaults to `https://opencode.ai/zen/v1` in `.env.example`. Point at vLLM / LM Studio / LiteLLM / any OpenAI-compatible `/chat/completions` server to switch backends.
 - `DEFAULT_MODEL` — required, `provider/model` shape (e.g. `opencode/qwen3.5-plus`). Validated at startup.
 - `PORT` — optional, defaults to 3000.
