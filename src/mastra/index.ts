@@ -1,5 +1,5 @@
 import { Mastra } from '@mastra/core/mastra'
-import { defaultAgent } from './agents/default-agent.js'
+import { defaultAgent } from './agents/default-agent'
 
 export const mastra = new Mastra({
   agents: { defaultAgent },

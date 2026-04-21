@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from 'vitest'
 
-vi.mock('./services/chat-service.js', () => ({
+vi.mock('./services/chat-service', () => ({
   getChatService: () => ({
     generate: vi.fn(),
     stream: vi.fn(),
@@ -8,8 +8,8 @@ vi.mock('./services/chat-service.js', () => ({
 }))
 
 const loadApp = async () => {
-  const mod = await import('./index.js')
-  return mod.default
+  const mod = await import('./index')
+  return mod.app
 }
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i

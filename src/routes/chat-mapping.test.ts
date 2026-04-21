@@ -4,8 +4,8 @@ import {
   newId,
   toOpenAIChunk,
   toOpenAIResponse,
-} from './chat-mapping.js'
-import type { ChatCompletionResponse } from '../schemas/openai.js'
+} from './chat-mapping'
+import type { ChatCompletionResponse } from '../schemas/openai'
 
 describe('approxTokens', () => {
   it('returns at least 1 for empty text', () => {

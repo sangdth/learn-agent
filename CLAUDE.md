@@ -4,24 +4,27 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Repo intent
 
-`learn-agent` is a learning sandbox for building an AI agent on top of [Hono](https://hono.dev). It is in its initial state — a single-route "Hello Hono!" server — and is expected to grow agent-related tooling over time.
+`learn-agent` is a learning sandbox for building an AI agent on top of [Hono](https://hono.dev). It runs on **Bun** (>= 1.1) — Bun is the runtime, package manager, bundler, and test loader for Vitest.
 
 ## Commands
 
-This project uses **pnpm** (see `pnpm-lock.yaml`). The README currently says `npm install`, but prefer pnpm to keep the lockfile authoritative.
+This project uses **Bun** (see `bun.lock`). All scripts run via `bun run <script>` or directly as `bun <file>`.
 
-| Task                              | Command           |
-| --------------------------------- | ----------------- |
-| Install deps                      | `pnpm install`    |
-| Dev server (watch mode via `tsx`) | `pnpm dev`        |
-| Type-check and build to `dist/`   | `pnpm build`      |
-| Run built output                  | `pnpm start`      |
-| Run tests once (Vitest)           | `pnpm test`       |
-| Run tests in watch mode           | `pnpm test:watch` |
+| Task                              | Command              |
+| --------------------------------- | -------------------- |
+| Install deps                      | `bun install`        |
+| Dev server (watch mode)           | `bun dev`            |
+| Run `src/index.ts` directly       | `bun start`          |
+| Bundle to `dist/index.js`         | `bun run build`      |
+| Type-check (`tsc --noEmit`)       | `bun run typecheck`  |
+| Run tests once (Vitest)           | `bun run test`       |
+| Run tests in watch mode           | `bun run test:watch` |
 
-The dev server listens on `http://localhost:3000`. `dev` and `start` scripts load `.env` via Node 20's `--env-file` flag — no `dotenv` dependency.
+**⚠️ Use `bun run test`, not `bun test`.** `bun test` triggers Bun's native test runner, which doesn't understand `vi.mock` / `vi.hoisted` and will error out. The `run` prefix routes through the npm-script layer and invokes `vitest run`.
 
-Tests live alongside source as `*.test.ts`. They run under Vitest with `passWithNoTests` enabled and are excluded from the `tsc` build output.
+The dev server listens on `http://localhost:3000`. `.env` is auto-loaded by Bun — no `--env-file` flag, no `dotenv` dependency.
+
+Tests live alongside source as `*.test.ts`. They run under Vitest (not `bun test` — the suite uses `vi.mock` / `vi.hoisted`). Vitest is excluded from `tsc`'s type-check output.
 
 ## Architecture
 
@@ -34,7 +37,7 @@ client → index.ts  (logger → cors → requestId → routes → onError/notFo
                                                             └─ mastra/agents/default-agent.ts  (env → Agent)
 ```
 
-- **Entrypoint (`src/index.ts`):** Builds the app via `createRouter()` so `Variables` is typed, applies global middleware in order (`logger`, `cors`, `requestId`), exposes `GET /healthz`, mounts route groups with `app.route()`, then calls `registerErrorHandler(app)` which wires both `onError` and `notFound`. Server starts via `@hono/node-server` unless `NODE_ENV === 'test'`.
+- **Entrypoint (`src/index.ts`):** Builds the app via `createRouter()` so `Variables` is typed, applies global middleware in order (`logger`, `cors`, `requestId`), exposes `GET /healthz`, mounts route groups with `app.route()`, then calls `registerErrorHandler(app)` which wires both `onError` and `notFound`. Exports named `app` (for tests) plus a default `{ port, fetch }` object that Bun auto-serves when the file is the CLI entrypoint.
 - **Router factory (`src/utils/create-router.ts`):** `createRouter()` returns `new Hono<{ Variables: { requestId: string } }>()`. Every sub-router uses it so `c.get('requestId')` is typed everywhere.
 - **Middleware (`src/middleware/`):** `requestId` reads `x-request-id` (or generates a UUID), stores it in context, mirrors it back in the response header.
 - **Config (`src/config/env.ts`):** Single Zod schema parses `process.env` at module load. `OPENCODE_API_KEY`, `OPENCODE_BASE_URL`, `DEFAULT_MODEL`, `PORT`, `NODE_ENV`. Failures throw one aggregated error naming every missing/invalid field.
@@ -42,7 +45,7 @@ client → index.ts  (logger → cors → requestId → routes → onError/notFo
 - **Mastra layer (`src/mastra/`):** `default-agent.ts` reads from `env` and builds one `Agent` (OpenAI-compatible model config). `index.ts` registers it on a `Mastra` instance and exposes `getDefaultAgent()`.
 - **Chat route (`src/routes/chat.ts`):** Validates the OpenAI-shaped request with `zValidator`, delegates to `getChatService()`, and translates outputs into OpenAI `chat.completion` / `chat.completion.chunk` SSE frames via pure helpers in `src/routes/chat-mapping.ts`. Streaming errors emit a terminal `{ error: {...} }` SSE frame + `[DONE]` because `onError` can't reach an already-open stream.
 - **Error handling (`src/utils/error-handler.ts`):** `registerErrorHandler(app)` attaches `onError` and `notFound`. Errors map to `{ error: { code, message, requestId } }`. `HTTPException` → its own status, `ZodError` → 400 `validation_error`, everything else → 500 `internal_error` with a generic message (never leaks `err.message`).
-- **Runtime:** Node via `@hono/node-server`. `tsx watch` runs TypeScript directly in dev; `tsc` emits ESM to `dist/` for `pnpm start`.
+- **Runtime:** Bun's native `Bun.serve` — picked up automatically from the default export of `src/index.ts`. `bun --watch` handles dev reload; `bun build` emits a single minified `dist/index.js` for `bun start` in prod.
 
 ### Response envelopes
 
@@ -74,7 +77,9 @@ Because the agent uses Mastra's `OpenAICompatibleConfig` (just `id`, `url`, `api
 
 These tsconfig choices shape how imports and types must be written:
 
-- **`"type": "module"` + `"module": "NodeNext"`** — ESM only. Local relative imports must include an explicit `.js` extension (e.g. `import { foo } from './foo.js'`) even though the source file is `.ts`.
+- **`"module": "ESNext"` + `"moduleResolution": "Bundler"`** — relative imports are written without file extensions (`import { foo } from './foo'`). Bun's resolver does the same at runtime. If you see an import with `.js` somewhere, it's a leftover from the pre-Bun era and can be stripped.
+- **`"type": "module"`** — ESM only; no CommonJS interop assumed.
 - **`verbatimModuleSyntax: true`** — type-only imports must use `import type { X } from '...'`; mixing values and types in one import that only uses the type side will fail to compile.
 - **`jsx: "react-jsx"` with `jsxImportSource: "hono/jsx"`** — Hono JSX is pre-wired. `.tsx` files render through Hono's JSX runtime, not React. Nothing uses this yet, but it's available without extra setup.
 - **`strict: true`** — no implicit `any`, strict null checks, etc.
+- **`types: ["bun"]`** — `@types/bun` supplies Bun globals (`Bun`, `import.meta.main`) plus Node-compat types (`process`, `crypto`, etc.). Do not add `@types/node` — it conflicts with the Bun types.

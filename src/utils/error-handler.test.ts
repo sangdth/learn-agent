@@ -1,9 +1,9 @@
 import { describe, it, expect } from 'vitest'
 import { HTTPException } from 'hono/http-exception'
 import { z, ZodError } from 'zod'
-import { toErrorResponse, registerErrorHandler } from './error-handler.js'
-import { createRouter } from './create-router.js'
-import { requestId } from '../middleware/request-id.js'
+import { toErrorResponse, registerErrorHandler } from './error-handler'
+import { createRouter } from './create-router'
+import { requestId } from '../middleware/request-id'
 
 describe('toErrorResponse', () => {
   const rid = 'req-1'

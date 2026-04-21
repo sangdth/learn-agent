@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
-import { createRouter } from '../utils/create-router.js'
-import { requestId } from './request-id.js'
+import { createRouter } from '../utils/create-router'
+import { requestId } from './request-id'
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 

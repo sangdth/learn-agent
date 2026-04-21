@@ -1,5 +1,5 @@
 import { Agent } from '@mastra/core/agent'
-import { env } from '../../config/env.js'
+import { env } from '../../config/env'
 
 export const defaultAgent = new Agent({
   id: 'default-agent',

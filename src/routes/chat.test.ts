@@ -5,7 +5,7 @@ const { generateMock, streamMock } = vi.hoisted(() => ({
   streamMock: vi.fn(),
 }))
 
-vi.mock('../services/chat-service.js', () => ({
+vi.mock('../services/chat-service', () => ({
   getChatService: () => ({
     generate: generateMock,
     stream: streamMock,
@@ -13,7 +13,7 @@ vi.mock('../services/chat-service.js', () => ({
 }))
 
 const loadRoute = async () => {
-  const mod = await import('./chat.js')
+  const mod = await import('./chat')
   return mod.chatRoute
 }
 

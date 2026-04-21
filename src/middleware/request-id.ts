@@ -1,5 +1,5 @@
 import { createMiddleware } from 'hono/factory'
-import type { AppEnv } from '../utils/create-router.js'
+import type { AppEnv } from '../utils/create-router'
 
 const HEADER = 'x-request-id'
 

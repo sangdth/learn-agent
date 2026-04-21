@@ -1,6 +1,6 @@
-import { getDefaultAgent } from '../mastra/index.js'
-import type { DefaultAgent } from '../mastra/agents/default-agent.js'
-import type { ChatMessage } from '../schemas/openai.js'
+import { getDefaultAgent } from '../mastra/index'
+import type { DefaultAgent } from '../mastra/agents/default-agent'
+import type { ChatMessage } from '../schemas/openai'
 
 export interface AgentMessage {
   role: ChatMessage['role']

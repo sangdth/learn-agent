@@ -1,13 +1,12 @@
-import { serve } from '@hono/node-server'
 import { logger } from 'hono/logger'
 import { cors } from 'hono/cors'
-import { chatRoute } from './routes/chat.js'
-import { createRouter } from './utils/create-router.js'
-import { registerErrorHandler } from './utils/error-handler.js'
-import { requestId } from './middleware/request-id.js'
-import { env } from './config/env.js'
+import { chatRoute } from './routes/chat'
+import { createRouter } from './utils/create-router'
+import { registerErrorHandler } from './utils/error-handler'
+import { requestId } from './middleware/request-id'
+import { env } from './config/env'
 
-const app = createRouter()
+export const app = createRouter()
 
 app.use('*', logger())
 app.use('*', cors())
@@ -22,16 +21,7 @@ registerErrorHandler(app)
 
 export type AppType = typeof app
 
-if (process.env.NODE_ENV !== 'test') {
-  serve(
-    {
-      fetch: app.fetch,
-      port: env.PORT,
-    },
-    (info) => {
-      console.log(`Server is running on http://localhost:${info.port}`)
-    },
-  )
+export default {
+  port: env.PORT,
+  fetch: app.fetch,
 }
-
-export default app

@@ -1,13 +1,13 @@
 import { streamSSE } from 'hono/streaming'
 import { zValidator } from '@hono/zod-validator'
-import { getChatService } from '../services/chat-service.js'
-import { createRouter } from '../utils/create-router.js'
+import { getChatService } from '../services/chat-service'
+import { createRouter } from '../utils/create-router'
 import {
   chatCompletionRequestSchema,
   type ChatCompletionChunk,
-} from '../schemas/openai.js'
-import { newId, toOpenAIChunk, toOpenAIResponse } from './chat-mapping.js'
-import type { ApiErrorBody } from '../utils/error-handler.js'
+} from '../schemas/openai'
+import { newId, toOpenAIChunk, toOpenAIResponse } from './chat-mapping'
+import type { ApiErrorBody } from '../utils/error-handler'
 
 export const chatRoute = createRouter().post(
   '/completions',

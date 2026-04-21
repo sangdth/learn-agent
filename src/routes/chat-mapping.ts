@@ -2,7 +2,7 @@ import type {
   ChatCompletionChunk,
   ChatCompletionResponse,
   ChatCompletionUsage,
-} from '../schemas/openai.js'
+} from '../schemas/openai'
 
 export const approxTokens = (text: string): number =>
   Math.max(1, Math.ceil(text.length / 4))

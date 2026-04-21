@@ -1,7 +1,7 @@
 import { HTTPException } from 'hono/http-exception'
 import type { Hono } from 'hono'
 import { ZodError } from 'zod'
-import type { AppEnv } from './create-router.js'
+import type { AppEnv } from './create-router'
 
 export interface ApiError {
   code: string
