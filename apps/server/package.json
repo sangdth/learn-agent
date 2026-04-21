@@ -19,10 +19,12 @@
     "@hono/zod-validator": "^0.7.6",
     "@mastra/core": "^1.25.0",
     "@repo/schemas": "workspace:*",
+    "ai": "^5",
     "hono": "^4.12.14",
     "zod": "^4.3.6"
   },
   "devDependencies": {
+    "@repo/tsconfig": "workspace:*",
     "@types/bun": "^1.1.0",
     "typescript": "^5.8.3",
     "vitest": "^4.1.4"

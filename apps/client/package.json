@@ -9,7 +9,9 @@
     "typecheck": "svelte-check --tsconfig ./tsconfig.json"
   },
   "dependencies": {
+    "@ai-sdk/svelte": "^3",
     "@repo/schemas": "workspace:*",
+    "ai": "^5",
     "svelte": "^5.15.0"
   },
   "devDependencies": {
